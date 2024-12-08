@@ -7,5 +7,4 @@ ENV KAFKA_BROKER_ID=1
 
 EXPOSE 9092
 
-# Comando para iniciar Kafka
 CMD ["kafka-server-start.sh", "/opt/kafka/config/server.properties"]

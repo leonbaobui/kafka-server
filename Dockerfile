@@ -1,8 +1,8 @@
 FROM openjdk:11-jre-slim
 
 # Set environment variables for Kafka version
-ENV KAFKA_VERSION=3.5.1 \
-    SCALA_VERSION=2.13
+ENV KAFKA_VERSION=3.7.1 \
+    SCALA_VERSION=2.12
 
 # Download and extract Kafka binaries
 RUN apt-get update && apt-get install -y wget \

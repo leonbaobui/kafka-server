@@ -1,28 +1,42 @@
-FROM openjdk:11-jre-slim
+FROM alpine:latest AS kafka_dist
 
-# Set environment variables for Kafka version
-ENV KAFKA_VERSION=3.7.1 \
-    SCALA_VERSION=2.12
+ARG scala_version=2.13
+ARG kafka_version=3.7.1
+ARG kafka_distro_base_url=https://dlcdn.apache.org/kafka
 
-# Download and extract Kafka binaries
-RUN apt-get update && apt-get install -y wget \
-    && wget https://downloads.apache.org/kafka/${KAFKA_VERSION}/kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz \
-    && tar -xzf kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz -C /opt \
-    && mv /opt/kafka_${SCALA_VERSION}-${KAFKA_VERSION} /opt/kafka \
-    && rm kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz
+ENV kafka_distro=kafka_$scala_version-$kafka_version.tgz
+ENV kafka_distro_asc=$kafka_distro.asc
 
-# Set up Kafka and Zookeeper data directories
-RUN mkdir -p /opt/kafka/data /opt/kafka/logs
+RUN apk add --no-cache gnupg
 
-# Expose necessary ports
-EXPOSE 9092 2181
+WORKDIR /var/tmp
 
-# Add entrypoint script
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN wget -q $kafka_distro_base_url/$kafka_version/$kafka_distro
+RUN wget -q $kafka_distro_base_url/$kafka_version/$kafka_distro_asc
+RUN wget -q $kafka_distro_base_url/KEYS
 
-# Set the working directory
-WORKDIR /opt/kafka
+RUN gpg --import KEYS
+RUN gpg --verify $kafka_distro_asc $kafka_distro
 
-# Command to start Kafka and Zookeeper
-ENTRYPOINT ["docker-entrypoint.sh"]
+RUN tar -xzf $kafka_distro
+RUN rm -r kafka_$scala_version-$kafka_version/bin/windows
+
+
+FROM eclipse-temurin:17.0.3_7-jre
+
+ARG scala_version=2.13
+ARG kafka_version=3.7.1
+
+ENV KAFKA_VERSION=$kafka_version \
+    SCALA_VERSION=$scala_version \
+    KAFKA_HOME=/opt/kafka
+
+ENV PATH=${PATH}:${KAFKA_HOME}/bin
+
+RUN mkdir ${KAFKA_HOME} && apt-get update && apt-get install curl -y && apt-get clean
+
+COPY --from=kafka_dist /var/tmp/kafka_$scala_version-$kafka_version ${KAFKA_HOME}
+
+RUN chmod a+x ${KAFKA_HOME}/bin/*.sh
+
+CMD ["kafka-server-start.sh"]
